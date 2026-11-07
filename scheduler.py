@@ -1,7 +1,7 @@
 """Processor scheduling simulator core engine.
 
 This module contains the scheduling logic shared by the CLI, the PyQt GUI, and
-legacy compatibility wrappers (FCFS.py, RR.py, ...).
+legacy compatibility wrappers in algorithms/ (FCFS.py, RR.py, ...).
 
 The simulation models up to four CPU cores:
 - P-Core: processes 2 units of work per second, consumes 3 W while active,
@@ -537,6 +537,24 @@ def run_simulation(
     return Simulator(process_specs, core_config, algorithm, time_quantum).run()
 
 
+def _legacy_process_rows(
+    rows: Iterable[ProcessResult],
+) -> List[Tuple[int, int, int, int, int, float, int]]:
+    """Convert completed or terminated processes to the original result format."""
+    return [
+        (
+            row.pid,
+            row.arrival_time,
+            row.run_time,
+            row.waiting_time,
+            row.turnaround_time,
+            row.normalized_turnaround_time,
+            row.completion_time,
+        )
+        for row in rows
+    ]
+
+
 def legacy_run(info: Sequence[object], algorithm: str) -> List[object]:
     """Return data in the list layout used by the original team project files."""
 
@@ -558,42 +576,17 @@ def legacy_run(info: Sequence[object], algorithm: str) -> List[object]:
         power = result.core_power_history[core_id]
         core_queues.append(list(zip(timeline, power)))
 
-    completed_rows = [
-        (
-            row.pid,
-            row.arrival_time,
-            row.run_time,
-            row.waiting_time,
-            row.turnaround_time,
-            row.normalized_turnaround_time,
-            row.completion_time,
-        )
-        for row in result.completed
-    ]
-
     output: List[object] = [
         core_queues[0],
         core_queues[1],
         core_queues[2],
         core_queues[3],
         result.total_power_history,
-        completed_rows,
+        _legacy_process_rows(result.completed),
         result.ready_queue_history,
     ]
 
     if algorithm.upper() == "DRR":
-        terminated_rows = [
-            (
-                row.pid,
-                row.arrival_time,
-                row.run_time,
-                row.waiting_time,
-                row.turnaround_time,
-                row.normalized_turnaround_time,
-                row.completion_time,
-            )
-            for row in result.terminated
-        ]
-        output.append(terminated_rows)
+        output.append(_legacy_process_rows(result.terminated))
 
     return output

@@ -1,8 +1,10 @@
+"""PyQt interface for the processor scheduling simulator."""
+
 import random
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from PyQt5 import uic
 from PyQt5.QtCore import QSize, Qt
@@ -18,7 +20,7 @@ from PyQt5.QtWidgets import (
     QTableWidgetItem,
 )
 
-from scheduler import ProcessSpec, SimulationResult, run_simulation
+from scheduler import ALGORITHMS, ProcessSpec, SimulationResult, run_simulation
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -96,7 +98,6 @@ class ProcessScheduler:
     def get_processes_length(self) -> int:
         return len(self.processes)
 
-
     def next_process_id(self) -> int:
         used = {p.process_id for p in self.processes}
         candidate = 1
@@ -106,14 +107,8 @@ class ProcessScheduler:
 
 
 class OS_Scheduler(QMainWindow, form_class):
-    ALGORITHM_MAP = {
-        1: "FCFS",
-        2: "RR",
-        3: "SPN",
-        4: "SRTN",
-        5: "HRRN",
-        6: "DRR",
-    }
+    ALGORITHM_MAP = dict(enumerate(ALGORITHMS, start=1))
+    POWER_LABELS = ("label_3", "label_5", "label_8", "label_9")
     ALGORITHM_HINTS = {
         0: "알고리즘을 선택하고 코어와 프로세스를 구성하세요.",
         1: "먼저 도착한 프로세스부터 순서대로 처리합니다.",
@@ -142,6 +137,15 @@ class OS_Scheduler(QMainWindow, form_class):
 
         self.scheduler = ProcessScheduler()
 
+        self._configure_window()
+        self._configure_controls()
+        self._configure_tables()
+        self._connect_signals()
+        self._update_core_label()
+        self._clear_output()
+        self._fit_timeline_height()
+
+    def _configure_window(self) -> None:
         self.setWindowTitle("OS Scheduler")
         self.setWindowIcon(icon("logo.png"))
         self.setStyleSheet((ASSETS_DIR / "styles.qss").read_text(encoding="utf-8"))
@@ -158,6 +162,7 @@ class OS_Scheduler(QMainWindow, form_class):
         else:
             self.resize(1360, 900)
 
+    def _configure_controls(self) -> None:
         self.pb_model1.setCheckable(True)
         self.pb_model2.setCheckable(True)
         self.pb_high.setCheckable(True)
@@ -172,6 +177,14 @@ class OS_Scheduler(QMainWindow, form_class):
         self.sb_Timeq.setRange(1, 20)
         self.sb_Timeq.setValue(2)
 
+        for index, field in enumerate(("프로세스 번호", "도착 시간", "작업량"), 1):
+            for direction, action in (("up", "늘리기"), ("down", "줄이기")):
+                button = getattr(self, "pb_{}{}".format(direction, index))
+                button.setAccessibleName("{} {}".format(field, action))
+                button.setToolTip("{} {}".format(field, action))
+        self.lb_algorithm_hint.setText(self.ALGORITHM_HINTS[0])
+
+    def _configure_tables(self) -> None:
         self.tw_process.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tw_result.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tw_gantt.horizontalHeader().setMinimumSectionSize(42)
@@ -194,17 +207,12 @@ class OS_Scheduler(QMainWindow, form_class):
             "대기 시간 (초)", "반환 시간 (초)", "정규화 반환 시간",
         )):
             self.tw_result.horizontalHeaderItem(column).setToolTip(description)
-        for index, field in enumerate(("프로세스 번호", "도착 시간", "작업량"), 1):
-            for direction, action in (("up", "늘리기"), ("down", "줄이기")):
-                button = getattr(self, "pb_{}{}".format(direction, index))
-                button.setAccessibleName("{} {}".format(field, action))
-                button.setToolTip("{} {}".format(field, action))
-        self.lb_algorithm_hint.setText(self.ALGORITHM_HINTS[0])
 
+    def _connect_signals(self) -> None:
         self.cb_algorithm.currentIndexChanged.connect(
             lambda index: self.comboBoxFunction(1, index)
         )
-        for i in range(4):
+        for i in range(len(self.core)):
             combobox = getattr(self, "cb_core{}".format(i))
             combobox.currentIndexChanged.connect(
                 lambda index, i=i: self.comboBoxFunction(i + 2, index)
@@ -218,10 +226,10 @@ class OS_Scheduler(QMainWindow, form_class):
 
         for i in range(3):
             getattr(self, "pb_up{}".format(i + 1)).clicked.connect(
-                (lambda index: lambda: self.processAddFunction(index * 2 + 1))(i)
+                lambda checked=False, flag=i * 2 + 1: self.processAddFunction(flag)
             )
             getattr(self, "pb_down{}".format(i + 1)).clicked.connect(
-                (lambda index: lambda: self.processAddFunction(index * 2 + 2))(i)
+                lambda checked=False, flag=i * 2 + 2: self.processAddFunction(flag)
             )
 
         self.pb_resetp.clicked.connect(lambda: self.processAddFunction(7))
@@ -233,8 +241,7 @@ class OS_Scheduler(QMainWindow, form_class):
         self.pb_start.clicked.connect(self.startFunction)
         self.sb_Timeq.valueChanged.connect(self._on_time_quantum_changed)
 
-        self._update_core_label()
-        self._clear_output()
+    def _fit_timeline_height(self) -> None:
         self.tw_gantt.ensurePolished()
         self.tw_gantt.horizontalHeader().ensurePolished()
         self.tw_gantt.horizontalScrollBar().ensurePolished()
@@ -307,7 +314,7 @@ class OS_Scheduler(QMainWindow, form_class):
         self.lb_total_power.setText("—")
         self.lb_process_count.setText("{}개".format(len(self.scheduler.processes)))
         self._set_run_status("분석 대기", "waiting")
-        for label_name in ("label_3", "label_5", "label_8", "label_9"):
+        for label_name in self.POWER_LABELS:
             getattr(self, label_name).setText("0.0 W")
         self.statusBar().clearMessage()
 
@@ -435,8 +442,7 @@ class OS_Scheduler(QMainWindow, form_class):
         self.tw_result.setSortingEnabled(True)
 
     def _render_power(self, result: SimulationResult) -> None:
-        power_labels = ["label_3", "label_5", "label_8", "label_9"]
-        for core_id, label_name in enumerate(power_labels):
+        for core_id, label_name in enumerate(self.POWER_LABELS):
             getattr(self, label_name).setText(
                 "{:.1f} W".format(result.core_power_usage.get(core_id, 0.0))
             )
@@ -659,9 +665,7 @@ class OS_Scheduler(QMainWindow, form_class):
     def _reset_gpt_selection(self) -> None:
         self.selected_model_flag = None
         self.selected_complexity_flag = None
-        for button in (self.pb_model1, self.pb_model2):
-            button.setChecked(False)
-        for button in (self.pb_high, self.pb_mid, self.pb_low):
+        for button in (self.pb_model1, self.pb_model2, self.pb_high, self.pb_mid, self.pb_low):
             button.setChecked(False)
 
 

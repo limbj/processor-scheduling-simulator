@@ -73,9 +73,7 @@ QLabel[role="metric_label"] {
     font-size: 11px;
 }
 
-QLabel[role="metric_value"], QLabel#lb_time,
-QLabel#lb_time_placeholder, QLabel#lb_average_wt,
-QLabel#lb_average_ntt, QLabel#lb_total_power {
+QLabel[role="metric_value"] {
     color: #243b59;
     font-size: 24px;
     font-weight: 600;
@@ -124,13 +122,6 @@ QGroupBox {
     margin-top: 0px;
     padding: 0px;
     background: transparent;
-}
-
-QGroupBox::title {
-    color: #596b83;
-    font-size: 11px;
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
 }
 
 QGroupBox:disabled, QLabel:disabled {

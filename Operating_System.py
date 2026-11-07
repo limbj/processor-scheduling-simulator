@@ -6,7 +6,7 @@ For the full graphical interface, run ``python ui.py``.
 from scheduler import ProcessSpec, run_simulation
 
 
-def main():
+def main() -> None:
     processes = [
         ProcessSpec(1, 1, 6, "GPT 3.5", 6),
         ProcessSpec(2, 12, 20, "GPT 4", 10),
