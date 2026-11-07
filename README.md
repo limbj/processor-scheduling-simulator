@@ -80,6 +80,8 @@ pip install -r requirements.txt
 python ui.py
 ```
 
+화면·스타일·이미지는 `assets/`에서 스크립트 위치를 기준으로 불러옵니다. 다른 작업 폴더에서 `ui.py`의 전체 경로로 실행해도 같은 화면을 사용할 수 있으며, 실행한 작업 폴더는 바뀌지 않습니다.
+
 1. 스케줄링 알고리즘을 선택합니다.
 2. Core 0~3을 P-Core / E-Core / Off 중에서 선택합니다.
 3. 프로세스를 직접 입력하거나 Random 버튼으로 생성합니다.
@@ -122,15 +124,14 @@ GUI 테스트는 `requirements.txt`의 PyQt5를 사용하며, 실제 Qt 위젯�
 - 표시 전용 표의 편집 방지
 - 분석 조건 변경·실행 실패 시 이전 결과 초기화, 거부된 입력의 기존 결과 보존
 - 요약 지표·프로세스 개수 표시와 DRR 버튼 흐름, 작은 창에서의 입력 접근성
+- 다른 작업 폴더에서 GUI 리소스 로딩과 작업 폴더 유지
 
 ## 프로젝트 구조
 
 ```text
-Operating_System/
+processor-scheduling-simulator/
 ├─ scheduler.py          # 공통 스케줄링 / 전력 계산 엔진
 ├─ ui.py                 # PyQt GUI와 스케줄러 연결
-├─ os.ui                 # Qt Designer UI
-├─ styles.qss            # 화면 색상·글꼴·표·버튼 테마
 ├─ Operating_System.py   # CLI 데모
 ├─ FCFS.py               # 기존 main(Info) 호환 wrapper
 ├─ RR.py
@@ -138,12 +139,19 @@ Operating_System/
 ├─ SRTN.py
 ├─ HRRN.py
 ├─ DRR.py
-├─ logo/                 # GUI 이미지 리소스
+├─ assets/               # GUI 리소스
+│  ├─ os.ui              # Qt Designer 화면 배치
+│  ├─ styles.qss         # 화면 색상·글꼴·표·버튼 테마
+│  └─ images/            # 로고와 기존 이미지
 ├─ docs/                 # 기존 프로젝트 문서
-├─ tests/                # 스케줄러 테스트
+├─ tests/                # 엔진·GUI·리소스 경로 회귀 테스트
+├─ .gitignore
+├─ CHANGELOG.md
 ├─ requirements.txt
 └─ README.md
 ```
+
+계산 엔진과 실행 파일, 알고리즘별 호환 wrapper는 루트에 유지합니다. 화면 배치·스타일·이미지는 `assets/`, 검증 코드는 `tests/`, 기존 프로젝트 문서는 `docs/`에서 관리합니다.
 
 ## 기존 코드와의 호환성
 

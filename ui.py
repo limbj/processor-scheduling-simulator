@@ -1,4 +1,3 @@
-import os
 import random
 import sys
 from dataclasses import dataclass
@@ -22,8 +21,8 @@ from scheduler import ProcessSpec, SimulationResult, run_simulation
 
 
 BASE_DIR = Path(__file__).resolve().parent
-os.chdir(str(BASE_DIR))
-form_class = uic.loadUiType(str(BASE_DIR / "os.ui"))[0]
+ASSETS_DIR = BASE_DIR / "assets"
+form_class = uic.loadUiType(str(ASSETS_DIR / "os.ui"))[0]
 
 PROCESS_COLORS = (
     "#d9e8fb", "#dceee7", "#e9e1f5", "#fae8d8",
@@ -32,7 +31,7 @@ PROCESS_COLORS = (
 
 
 def icon(name: str) -> QIcon:
-    return QIcon(str(BASE_DIR / "logo" / name))
+    return QIcon(str(ASSETS_DIR / "images" / name))
 
 
 def readonly_item(text: str) -> QTableWidgetItem:
@@ -137,7 +136,7 @@ class OS_Scheduler(QMainWindow, form_class):
 
         self.setWindowTitle("OS Scheduler")
         self.setWindowIcon(icon("logo.png"))
-        self.setStyleSheet((BASE_DIR / "styles.qss").read_text(encoding="utf-8"))
+        self.setStyleSheet((ASSETS_DIR / "styles.qss").read_text(encoding="utf-8"))
         self.lb_run_status.setMaximumHeight(28)
         self.setMinimumSize(1040, 660)
         screen = QApplication.primaryScreen()
