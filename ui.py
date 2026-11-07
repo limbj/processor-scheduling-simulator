@@ -44,8 +44,16 @@ def option_icon(inactive_name: str, active_name: str) -> QIcon:
     return result
 
 
-def readonly_item(text: str) -> QTableWidgetItem:
-    item = QTableWidgetItem(text)
+class NumericTableWidgetItem(QTableWidgetItem):
+    """Sort displayed numbers numerically while preserving their text format."""
+
+    def __lt__(self, other):
+        return float(self.text()) < float(other.text())
+
+
+def readonly_item(text: str, *, numeric: bool = False) -> QTableWidgetItem:
+    item_type = NumericTableWidgetItem if numeric else QTableWidgetItem
+    item = item_type(text)
     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
     return item
 
@@ -433,7 +441,7 @@ class OS_Scheduler(QMainWindow, form_class):
                 "{:.2f}".format(row_data.normalized_turnaround_time),
             ]
             for column, value in enumerate(values):
-                item = readonly_item(value)
+                item = readonly_item(value, numeric=column > 0)
                 item.setTextAlignment(Qt.AlignCenter)
                 if row_data.status == "terminated":
                     item.setToolTip("BT가 30 이상인 프로세스가 30 work unit을 처리하여 강제 종료됨")

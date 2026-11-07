@@ -156,6 +156,71 @@ class SchedulerGuiTests(unittest.TestCase):
         self.window.processRemoveFunction()
         self.assertEqual(self.window.scheduler.processes, [])
 
+    def test_result_waiting_and_turnaround_columns_sort_two_digit_numbers(self):
+        self.window.cb_core0.setCurrentIndex(2)
+        for pid, burst in ((1, 2), (2, 8), (3, 1)):
+            self.add(pid, bt=burst)
+        self.window.startFunction()
+        self.assertIsNotNone(self.window.last_result)
+        table = self.window.tw_result
+        for column, expected in ((3, ["0", "2", "10"]), (4, ["2", "10", "11"])):
+            for order in (Qt.AscendingOrder, Qt.DescendingOrder):
+                with self.subTest(column=column, order=order):
+                    table.sortItems(column, order)
+                    actual = [table.item(row, column).text() for row in range(table.rowCount())]
+                    self.assertEqual(actual, expected if order == Qt.AscendingOrder else expected[::-1])
+
+    def test_result_arrival_and_burst_columns_sort_numerically(self):
+        self.window.cb_core0.setCurrentIndex(2)
+        for pid, arrival, burst in ((1, 2, 12), (2, 10, 2), (3, 1, 3)):
+            self.add(pid, at=arrival, bt=burst)
+        self.window.startFunction()
+        self.assertIsNotNone(self.window.last_result)
+        table = self.window.tw_result
+        for column, expected in ((1, ["1", "2", "10"]), (2, ["2", "3", "12"])):
+            for order in (Qt.AscendingOrder, Qt.DescendingOrder):
+                with self.subTest(column=column, order=order):
+                    table.sortItems(column, order)
+                    actual = [table.item(row, column).text() for row in range(table.rowCount())]
+                    self.assertEqual(actual, expected if order == Qt.AscendingOrder else expected[::-1])
+
+    def test_result_ntt_sorts_decimals_numerically_and_keeps_two_decimal_places(self):
+        self.window.cb_core0.setCurrentIndex(2)
+        for pid, burst in ((1, 3), (2, 2), (3, 5), (4, 1)):
+            self.add(pid, bt=burst)
+        self.window.startFunction()
+        self.assertIsNotNone(self.window.last_result)
+        table = self.window.tw_result
+        expected = ["1.00", "2.00", "2.50", "11.00"]
+        for order in (Qt.AscendingOrder, Qt.DescendingOrder):
+            with self.subTest(order=order):
+                table.sortItems(5, order)
+                actual = [table.item(row, 5).text() for row in range(table.rowCount())]
+                self.assertEqual(actual, expected if order == Qt.AscendingOrder else expected[::-1])
+
+    def test_sorted_terminated_results_preserve_out_label_tooltips_and_readonly_flags(self):
+        self.window.cb_algorithm.setCurrentIndex(6)
+        self.add(1, bt=35)
+        self.add(2, bt=2)
+        self.window.startFunction()
+        result = self.window.last_result
+        self.assertIsNotNone(result)
+        self.assertEqual([process.pid for process in result.terminated], [1])
+        table = self.window.tw_result
+        table.sortItems(3, Qt.AscendingOrder)
+        found_terminated = False
+        for row in range(table.rowCount()):
+            terminated = table.item(row, 0).text() == "P01 (OUT)"
+            found_terminated |= terminated
+            self.assertRegex(table.item(row, 5).text(), r"^\d+\.\d{2}$")
+            for column in range(table.columnCount()):
+                item = table.item(row, column)
+                self.assertFalse(item.flags() & Qt.ItemIsEditable)
+                self.assertTrue(item.flags() & Qt.ItemIsSelectable)
+                if terminated:
+                    self.assertIn("강제 종료", item.toolTip())
+        self.assertTrue(found_terminated)
+
     def test_delete_uses_stable_identity_even_if_display_label_changes(self):
         self.add(1)
         self.add(3)
