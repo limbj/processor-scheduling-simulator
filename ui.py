@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QHeaderView,
+    QLayout,
     QMainWindow,
     QMessageBox,
     QTableWidgetItem,
@@ -23,6 +24,11 @@ from scheduler import ProcessSpec, SimulationResult, run_simulation
 BASE_DIR = Path(__file__).resolve().parent
 os.chdir(str(BASE_DIR))
 form_class = uic.loadUiType(str(BASE_DIR / "os.ui"))[0]
+
+PROCESS_COLORS = (
+    "#d9e8fb", "#dceee7", "#e9e1f5", "#fae8d8",
+    "#dcecf1", "#f3dfe5", "#e8edcd", "#e1e5f3",
+)
 
 
 def icon(name: str) -> QIcon:
@@ -101,6 +107,15 @@ class OS_Scheduler(QMainWindow, form_class):
         5: "HRRN",
         6: "DRR",
     }
+    ALGORITHM_HINTS = {
+        0: "알고리즘을 선택하고 코어와 프로세스를 구성하세요.",
+        1: "먼저 도착한 프로세스부터 순서대로 처리합니다.",
+        2: "지정한 시간 할당량만큼 번갈아 처리합니다.",
+        3: "대기 중인 프로세스 중 작업량이 가장 작은 것을 선택합니다.",
+        4: "남은 작업량이 가장 작은 프로세스를 우선 처리합니다.",
+        5: "대기시간과 작업량을 고려한 응답비율로 우선순위를 정합니다.",
+        6: "GPT 모델·복잡도로 프로세스를 생성하고 동적 시간 할당량을 적용합니다.",
+    }
 
     def __init__(self) -> None:
         super().__init__()
@@ -122,8 +137,19 @@ class OS_Scheduler(QMainWindow, form_class):
 
         self.setWindowTitle("OS Scheduler")
         self.setWindowIcon(icon("logo.png"))
-        self.move(200, 100)
-        self.resize(1600, 900)
+        self.setStyleSheet((BASE_DIR / "styles.qss").read_text(encoding="utf-8"))
+        self.lb_run_status.setMaximumHeight(28)
+        self.setMinimumSize(1040, 660)
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            self.resize(max(1040, min(1360, available.width() - 64)),
+                        max(660, min(940, available.height() - 64)))
+            frame = self.frameGeometry()
+            frame.moveCenter(available.center())
+            self.move(frame.topLeft())
+        else:
+            self.resize(1360, 900)
 
         self.pb_model1.setCheckable(True)
         self.pb_model2.setCheckable(True)
@@ -135,16 +161,38 @@ class OS_Scheduler(QMainWindow, form_class):
         self.pb_remove.setVisible(False)
         self.gb_model.setEnabled(False)
         self.gb_complex.setEnabled(False)
-        self.gb_model.setStyleSheet("color: lightgray")
-        self.gb_complex.setStyleSheet("color: lightgray")
         self.sb_Timeq.setRange(1, 20)
         self.sb_Timeq.setValue(2)
 
-        self.tw_process.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tw_result.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tw_gantt.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tw_process.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tw_result.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tw_gantt.horizontalHeader().setMinimumSectionSize(42)
+        self.tw_gantt.horizontalHeader().setStretchLastSection(False)
+        self.tw_gantt.setMinimumHeight(170)
+        self.tw_process.setMinimumHeight(132)
+        self.tw_result.setMinimumHeight(164)
+        self.workspace_layout.setSizeConstraint(QLayout.SetMinimumSize)
+        self.sidebar_layout.setSizeConstraint(QLayout.SetMinimumSize)
         for table in (self.tw_process, self.tw_result, self.tw_gantt):
             table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            table.verticalHeader().setVisible(False)
+            table.verticalHeader().setDefaultSectionSize(32)
+            table.setShowGrid(False)
+            table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+            table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.tw_process.setAlternatingRowColors(True)
+        self.tw_result.setAlternatingRowColors(True)
+        for column, description in enumerate((
+            "프로세스 식별자", "도착 시간 (초)", "처리할 작업량 (work units)",
+            "대기 시간 (초)", "반환 시간 (초)", "정규화 반환 시간",
+        )):
+            self.tw_result.horizontalHeaderItem(column).setToolTip(description)
+        for index, field in enumerate(("프로세스 번호", "도착 시간", "작업량"), 1):
+            for direction, action in (("up", "늘리기"), ("down", "줄이기")):
+                button = getattr(self, "pb_{}{}".format(direction, index))
+                button.setAccessibleName("{} {}".format(field, action))
+                button.setToolTip("{} {}".format(field, action))
+        self.lb_algorithm_hint.setText(self.ALGORITHM_HINTS[0])
 
         self.cb_algorithm.currentIndexChanged.connect(
             lambda index: self.comboBoxFunction(1, index)
@@ -183,10 +231,16 @@ class OS_Scheduler(QMainWindow, form_class):
 
     def _update_core_label(self) -> None:
         self.lb_core.setText(
-            "현재 코어: P-Core : {}개, E-Core : {}개".format(
+            "P-Core {} · E-Core {}".format(
                 self.core.count(1), self.core.count(2)
             )
         )
+
+    def _set_run_status(self, text: str, state: str) -> None:
+        self.lb_run_status.setText(text)
+        self.lb_run_status.setProperty("state", state)
+        self.lb_run_status.style().unpolish(self.lb_run_status)
+        self.lb_run_status.style().polish(self.lb_run_status)
 
     def _clear_output(self) -> None:
         self.last_result = None
@@ -194,6 +248,12 @@ class OS_Scheduler(QMainWindow, form_class):
         self._prepare_gantt_core_rows()
         self.lb_time.setText("")
         self.lb_sec.setText("")
+        self.lb_time_placeholder.setVisible(True)
+        self.lb_average_wt.setText("—")
+        self.lb_average_ntt.setText("—")
+        self.lb_total_power.setText("—")
+        self.lb_process_count.setText("{}개".format(len(self.scheduler.processes)))
+        self._set_run_status("분석 대기", "waiting")
         for label_name in ("label_3", "label_5", "label_8", "label_9"):
             getattr(self, label_name).setText("0.0 W")
         self.statusBar().clearMessage()
@@ -217,6 +277,7 @@ class OS_Scheduler(QMainWindow, form_class):
             return
 
         try:
+            self._set_run_status("분석 중", "running")
             result = self.sendInfoToAlgorithmFunction()
             self._render_result(result)
         except (ValueError, RuntimeError) as exc:
@@ -251,6 +312,11 @@ class OS_Scheduler(QMainWindow, form_class):
         self._render_power(result)
         self.lb_time.setText(str(result.duration))
         self.lb_sec.setText("초")
+        self.lb_time_placeholder.setVisible(False)
+        self.lb_average_wt.setText("{:.2f} s".format(result.average_waiting_time))
+        self.lb_average_ntt.setText("{:.2f}".format(result.average_normalized_turnaround_time))
+        self.lb_total_power.setText("{:.1f} W".format(result.total_power_usage))
+        self._set_run_status("분석 완료", "complete")
         self.statusBar().showMessage(
             "평균 WT: {} | 평균 NTT: {} | 총 전력 사용량: {} W".format(
                 result.average_waiting_time,
@@ -285,6 +351,7 @@ class OS_Scheduler(QMainWindow, form_class):
                 self.tw_gantt.setItem(row, tick + 1, item)
 
         self.tw_gantt.resizeColumnsToContents()
+        self.tw_gantt.setColumnWidth(0, 100)
 
     def _render_result_table(self, result: SimulationResult) -> None:
         self.tw_result.setSortingEnabled(False)
@@ -414,11 +481,7 @@ class OS_Scheduler(QMainWindow, form_class):
     ) -> None:
         if any(p.process_id == pid for p in self.scheduler.processes):
             raise ValueError("프로세스 {}는 이미 존재합니다.".format(pid))
-        color = QColor(
-            random.randint(80, 230),
-            random.randint(80, 230),
-            random.randint(80, 230),
-        )
+        color = QColor(PROCESS_COLORS[(pid - 1) % len(PROCESS_COLORS)])
         sorting_enabled = self.tw_process.isSortingEnabled()
         self.tw_process.setSortingEnabled(False)
         try:
@@ -468,24 +531,16 @@ class OS_Scheduler(QMainWindow, form_class):
             changed = self.algorithm != index
             self.algorithm = index
             self.gb_Timeq.setVisible(index == 2)
-            self.cb_algorithm.move(10 if index == 2 else 100, 60)
+            self.lb_algorithm_hint.setText(self.ALGORITHM_HINTS.get(index, ""))
 
             is_drr = index == 6
             self.gb_model.setEnabled(is_drr)
             self.gb_complex.setEnabled(is_drr)
-            self.gb_model.setStyleSheet("color: black" if is_drr else "color: lightgray")
-            self.gb_complex.setStyleSheet("color: black" if is_drr else "color: lightgray")
             self.gb_add.setEnabled(not is_drr)
             self.pb_random.setEnabled(not is_drr)
             if changed:
                 self._clear_output()
 
-            if index != 0:
-                QMessageBox.about(
-                    self,
-                    "알고리즘 선택",
-                    "{} 알고리즘을 선택하셨습니다.".format(self.cb_algorithm.currentText()),
-                )
             return
 
         core_index = flag - 2
@@ -526,14 +581,11 @@ class OS_Scheduler(QMainWindow, form_class):
             self.selected_model_flag = flag
             self.pb_model1.setChecked(flag == 1)
             self.pb_model2.setChecked(flag == 2)
-            self.pb_model1.setIcon(icon("gpt-icon.png" if flag == 1 else "g_gpt-icon.png"))
-            self.pb_model2.setIcon(icon("gpt4-icon.png" if flag == 2 else "g_gpt-icon.png"))
         else:
             self.selected_complexity_flag = flag
             buttons = [(self.pb_high, 3), (self.pb_mid, 4), (self.pb_low, 5)]
             for button, button_flag in buttons:
                 button.setChecked(button_flag == flag)
-                button.setIcon(icon("complex.png" if button_flag == flag else "g_complex.png"))
 
         if self.selected_model_flag is not None and self.selected_complexity_flag is not None:
             model_name = "GPT 3.5" if self.selected_model_flag == 1 else "GPT 4"
@@ -556,10 +608,8 @@ class OS_Scheduler(QMainWindow, form_class):
         self.selected_complexity_flag = None
         for button in (self.pb_model1, self.pb_model2):
             button.setChecked(False)
-            button.setIcon(icon("g_gpt-icon.png"))
         for button in (self.pb_high, self.pb_mid, self.pb_low):
             button.setChecked(False)
-            button.setIcon(icon("g_complex.png"))
 
 
 if __name__ == "__main__":
