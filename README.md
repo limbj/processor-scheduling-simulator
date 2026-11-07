@@ -87,6 +87,8 @@ python ui.py
 5. DRR은 GPT 모델과 Complexity를 선택하면 시나리오용 프로세스 3개가 생성됩니다.
 6. 실행 버튼을 누르면 Gantt Chart, 처리 결과, Core별 전력 사용량이 표시됩니다.
 
+프로세스·결과·Gantt 표는 표시 전용입니다. 프로세스는 기존 추가·삭제 버튼으로 관리하며, 표 정렬은 그대로 사용할 수 있습니다. 프로세스·알고리즘·코어 또는 RR의 Time Quantum을 변경하면 이전 결과가 초기화되므로 다시 실행해 주세요.
+
 ## CLI 데모
 
 GUI 없이 DRR 예제를 실행할 수도 있습니다.
@@ -97,11 +99,13 @@ python Operating_System.py
 
 ## 테스트
 
-스케줄링 엔진은 Python 표준 `unittest`로 검증할 수 있습니다.
+권장 Python 3.9 환경에서 스케줄링 엔진과 GUI 입력 흐름을 `unittest`로 검증할 수 있습니다.
 
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+GUI 테스트는 `requirements.txt`의 PyQt5를 사용하며, 실제 Qt 위젯을 화면에 띄우지 않고 검증합니다. PyQt5가 설치되지 않은 환경에서는 GUI 테스트만 건너뛰고 엔진 테스트를 실행합니다.
 
 테스트 항목에는 다음이 포함됩니다.
 
@@ -111,6 +115,10 @@ python -m unittest discover -s tests -v
 - 사용하지 않는 E-Core의 전력 미소모
 - 장시간 DRR 프로세스의 30 work-unit 강제 종료
 - P-Core / E-Core 개수 제한
+- 삭제·수동 PID 입력 후 Random / DRR 생성의 번호 중복 방지
+- 표 정렬 후 프로세스 추가·선택·삭제와 표시 값 일치
+- 표시 전용 표의 편집 방지
+- 분석 조건 변경·실행 실패 시 이전 결과 초기화, 거부된 입력의 기존 결과 보존
 
 ## 프로젝트 구조
 

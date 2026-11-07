@@ -9,6 +9,7 @@ from PyQt5 import uic
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QIcon
 from PyQt5.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QHeaderView,
     QMainWindow,
@@ -26,6 +27,12 @@ form_class = uic.loadUiType(str(BASE_DIR / "os.ui"))[0]
 
 def icon(name: str) -> QIcon:
     return QIcon(str(BASE_DIR / "logo" / name))
+
+
+def readonly_item(text: str) -> QTableWidgetItem:
+    item = QTableWidgetItem(text)
+    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+    return item
 
 
 @dataclass
@@ -51,6 +58,8 @@ class ProcessScheduler:
         gpt_model: str = "N/A",
         complexity: int = 0,
     ) -> None:
+        if any(p.process_id == process_id for p in self.processes):
+            raise ValueError("프로세스 {}는 이미 존재합니다.".format(process_id))
         self.processes.append(
             UIProcess(
                 process_id,
@@ -73,6 +82,14 @@ class ProcessScheduler:
 
     def get_processes_length(self) -> int:
         return len(self.processes)
+
+
+    def next_process_id(self) -> int:
+        used = {p.process_id for p in self.processes}
+        candidate = 1
+        while candidate in used:
+            candidate += 1
+        return candidate
 
 
 class OS_Scheduler(QMainWindow, form_class):
@@ -126,6 +143,8 @@ class OS_Scheduler(QMainWindow, form_class):
         self.tw_process.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.tw_result.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.tw_gantt.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        for table in (self.tw_process, self.tw_result, self.tw_gantt):
+            table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         self.cb_algorithm.currentIndexChanged.connect(
             lambda index: self.comboBoxFunction(1, index)
@@ -157,9 +176,7 @@ class OS_Scheduler(QMainWindow, form_class):
         self.pb_random.clicked.connect(self.RandomAddProcessFunction)
         self.a_exit.triggered.connect(QApplication.exit)
         self.pb_start.clicked.connect(self.startFunction)
-        self.sb_Timeq.valueChanged.connect(
-            lambda value: setattr(self, "time_quantum", value)
-        )
+        self.sb_Timeq.valueChanged.connect(self._on_time_quantum_changed)
 
         self._update_core_label()
         self._clear_output()
@@ -172,18 +189,23 @@ class OS_Scheduler(QMainWindow, form_class):
         )
 
     def _clear_output(self) -> None:
+        self.last_result = None
         self.tw_result.setRowCount(0)
-        self.tw_gantt.clearContents()
-        self.tw_gantt.setRowCount(0)
-        self.tw_gantt.setColumnCount(1)
-        self.tw_gantt.setHorizontalHeaderItem(0, QTableWidgetItem("Core"))
+        self._prepare_gantt_core_rows()
         self.lb_time.setText("")
         self.lb_sec.setText("")
         for label_name in ("label_3", "label_5", "label_8", "label_9"):
             getattr(self, label_name).setText("0.0 W")
         self.statusBar().clearMessage()
 
+    def _on_time_quantum_changed(self, value: int) -> None:
+        changed = value != self.time_quantum
+        self.time_quantum = value
+        if changed and self.algorithm == 2:
+            self._clear_output()
+
     def startFunction(self) -> None:
+        self._clear_output()
         if not self.scheduler.processes:
             QMessageBox.warning(self, "시작 실패", "프로세스가 입력되지 않았습니다.")
             return
@@ -196,12 +218,13 @@ class OS_Scheduler(QMainWindow, form_class):
 
         try:
             result = self.sendInfoToAlgorithmFunction()
+            self._render_result(result)
         except (ValueError, RuntimeError) as exc:
+            self._clear_output()
             QMessageBox.critical(self, "실행 실패", str(exc))
             return
 
         self.last_result = result
-        self._render_result(result)
 
     def sendInfoToAlgorithmFunction(self) -> SimulationResult:
         algorithm_name = self.ALGORITHM_MAP[self.algorithm]
@@ -243,17 +266,17 @@ class OS_Scheduler(QMainWindow, form_class):
         self.tw_gantt.clearContents()
         self.tw_gantt.setRowCount(len(active_core_ids))
         self.tw_gantt.setColumnCount(result.duration + 1)
-        self.tw_gantt.setHorizontalHeaderItem(0, QTableWidgetItem("Core"))
+        self.tw_gantt.setHorizontalHeaderItem(0, readonly_item("Core"))
 
         for tick in range(result.duration):
-            self.tw_gantt.setHorizontalHeaderItem(tick + 1, QTableWidgetItem(str(tick)))
+            self.tw_gantt.setHorizontalHeaderItem(tick + 1, readonly_item(str(tick)))
 
         for row, core_id in enumerate(active_core_ids):
             core_type = result.core_types[core_id]
-            self.tw_gantt.setItem(row, 0, QTableWidgetItem("Core {}({})".format(core_id, core_type)))
+            self.tw_gantt.setItem(row, 0, readonly_item("Core {}({})".format(core_id, core_type)))
             timeline = result.core_timelines[core_id]
             for tick, pid in enumerate(timeline):
-                item = QTableWidgetItem("-" if pid == 0 else "P{:02}".format(pid))
+                item = readonly_item("-" if pid == 0 else "P{:02}".format(pid))
                 item.setTextAlignment(Qt.AlignCenter)
                 if pid:
                     color = self.scheduler.get_process_color(pid)
@@ -283,7 +306,7 @@ class OS_Scheduler(QMainWindow, form_class):
                 "{:.2f}".format(row_data.normalized_turnaround_time),
             ]
             for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
+                item = readonly_item(value)
                 item.setTextAlignment(Qt.AlignCenter)
                 if row_data.status == "terminated":
                     item.setToolTip("BT가 30 이상인 프로세스가 30 work unit을 처리하여 강제 종료됨")
@@ -299,11 +322,7 @@ class OS_Scheduler(QMainWindow, form_class):
             )
 
     def updateProcessNameFunction(self) -> None:
-        used = {p.process_id for p in self.scheduler.processes}
-        candidate = 1
-        while candidate in used:
-            candidate += 1
-        self.addProcessName = candidate
+        self.addProcessName = self.scheduler.next_process_id()
         self.lb_add_process.setText("P{:02}".format(self.addProcessName))
 
     def processAddFunction(self, flag: int) -> None:
@@ -350,7 +369,6 @@ class OS_Scheduler(QMainWindow, form_class):
                 self.updateProcessNameFunction()
 
     def RandomAddProcessFunction(self, is_DRR: bool = False) -> None:
-        start_pid = self.scheduler.get_processes_length() + 1
         if is_DRR:
             if self.selected_model_flag is None or self.selected_complexity_flag is None:
                 QMessageBox.warning(self, "생성 실패", "GPT 모델과 복잡도를 모두 선택해 주세요.")
@@ -364,11 +382,11 @@ class OS_Scheduler(QMainWindow, form_class):
                 5: (1, 5),    # Low
             }
             low, high = ranges[self.selected_complexity_flag]
-            for offset in range(3):
+            for _ in range(3):
                 complexity = random.randint(low, high)
                 burst = min(45, complexity * factor)
                 self.createProcessFunction(
-                    start_pid + offset,
+                    self.scheduler.next_process_id(),
                     random.randint(0, 15),
                     burst,
                     model_name,
@@ -376,9 +394,9 @@ class OS_Scheduler(QMainWindow, form_class):
                 )
         else:
             length = random.randint(3, 15)
-            for offset in range(length):
+            for _ in range(length):
                 self.createProcessFunction(
-                    start_pid + offset,
+                    self.scheduler.next_process_id(),
                     random.randint(0, 15),
                     random.randint(1, 20),
                     "N/A",
@@ -394,20 +412,29 @@ class OS_Scheduler(QMainWindow, form_class):
         gpt_model: str = "N/A",
         complexity: int = 0,
     ) -> None:
-        row = self.tw_process.rowCount()
-        self.tw_process.insertRow(row)
-        self.tw_process.setItem(row, 0, QTableWidgetItem("P{:02}".format(pid)))
-        self.tw_process.setItem(row, 1, QTableWidgetItem("{:02}".format(at)))
-        self.tw_process.setItem(row, 2, QTableWidgetItem("{:02}".format(bt)))
-        self.tw_process.scrollToBottom()
-
+        if any(p.process_id == pid for p in self.scheduler.processes):
+            raise ValueError("프로세스 {}는 이미 존재합니다.".format(pid))
         color = QColor(
             random.randint(80, 230),
             random.randint(80, 230),
             random.randint(80, 230),
         )
-        self.scheduler.add_process(pid, at, bt, color, gpt_model, complexity)
-        self.tw_process.item(row, 0).setBackground(color)
+        sorting_enabled = self.tw_process.isSortingEnabled()
+        self.tw_process.setSortingEnabled(False)
+        try:
+            row = self.tw_process.rowCount()
+            self.tw_process.insertRow(row)
+            pid_item = readonly_item("P{:02}".format(pid))
+            pid_item.setData(Qt.UserRole, pid)
+            pid_item.setBackground(color)
+            self.tw_process.setItem(row, 0, pid_item)
+            self.tw_process.setItem(row, 1, readonly_item("{:02}".format(at)))
+            self.tw_process.setItem(row, 2, readonly_item("{:02}".format(bt)))
+            self.scheduler.add_process(pid, at, bt, color, gpt_model, complexity)
+        finally:
+            self.tw_process.setSortingEnabled(sorting_enabled)
+        self.tw_process.scrollToBottom()
+        self._clear_output()
 
     def keyPressEvent(self, event) -> None:
         if event.key() == Qt.Key_Delete:
@@ -426,18 +453,19 @@ class OS_Scheduler(QMainWindow, form_class):
         for row in selected_rows:
             item = self.tw_process.item(row, 0)
             if item is not None:
-                pid = int(item.text().split()[0][1:])
-                self.scheduler.remove_process(pid)
+                self.scheduler.remove_process(item.data(Qt.UserRole))
             self.tw_process.removeRow(row)
 
         self.updateProcessNameFunction()
         self.pb_remove.setVisible(False)
+        self._clear_output()
 
     def rbVisibilityFunction(self) -> None:
         self.pb_remove.setVisible(self.tw_process.currentRow() >= 0)
 
     def comboBoxFunction(self, flag: int, index: int) -> None:
         if flag == 1:
+            changed = self.algorithm != index
             self.algorithm = index
             self.gb_Timeq.setVisible(index == 2)
             self.cb_algorithm.move(10 if index == 2 else 100, 60)
@@ -449,6 +477,8 @@ class OS_Scheduler(QMainWindow, form_class):
             self.gb_complex.setStyleSheet("color: black" if is_drr else "color: lightgray")
             self.gb_add.setEnabled(not is_drr)
             self.pb_random.setEnabled(not is_drr)
+            if changed:
+                self._clear_output()
 
             if index != 0:
                 QMessageBox.about(
@@ -470,9 +500,11 @@ class OS_Scheduler(QMainWindow, form_class):
             self._reset_core_combo(core_index)
             return
 
+        if proposed == self.core:
+            return
         self.core = proposed
         self._update_core_label()
-        self._prepare_gantt_core_rows()
+        self._clear_output()
 
     def _reset_core_combo(self, core_index: int) -> None:
         combobox = getattr(self, "cb_core{}".format(core_index))
@@ -483,11 +515,11 @@ class OS_Scheduler(QMainWindow, form_class):
     def _prepare_gantt_core_rows(self) -> None:
         self.tw_gantt.clearContents()
         self.tw_gantt.setColumnCount(1)
-        self.tw_gantt.setHorizontalHeaderItem(0, QTableWidgetItem("Core"))
+        self.tw_gantt.setHorizontalHeaderItem(0, readonly_item("Core"))
         active = [(i, "P" if core == 1 else "E") for i, core in enumerate(self.core) if core]
         self.tw_gantt.setRowCount(len(active))
         for row, (core_id, core_type) in enumerate(active):
-            self.tw_gantt.setItem(row, 0, QTableWidgetItem("Core {}({})".format(core_id, core_type)))
+            self.tw_gantt.setItem(row, 0, readonly_item("Core {}({})".format(core_id, core_type)))
 
     def GPTSelectFunction(self, flag: int) -> None:
         if flag in (1, 2):
