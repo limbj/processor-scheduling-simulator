@@ -133,12 +133,14 @@ processor-scheduling-simulator/
 ├─ scheduler.py          # 공통 스케줄링 / 전력 계산 엔진
 ├─ ui.py                 # PyQt GUI와 스케줄러 연결
 ├─ Operating_System.py   # CLI 데모
-├─ FCFS.py               # 기존 main(Info) 호환 wrapper
-├─ RR.py
-├─ SPN.py
-├─ SRTN.py
-├─ HRRN.py
-├─ DRR.py
+├─ algorithms/           # 알고리즘별 main(Info) 호출 모듈
+│  ├─ __init__.py
+│  ├─ FCFS.py
+│  ├─ RR.py
+│  ├─ SPN.py
+│  ├─ SRTN.py
+│  ├─ HRRN.py
+│  └─ DRR.py
 ├─ assets/               # GUI 리소스
 │  ├─ os.ui              # Qt Designer 화면 배치
 │  ├─ styles.qss         # 화면 색상·글꼴·표·버튼 테마
@@ -151,14 +153,14 @@ processor-scheduling-simulator/
 └─ README.md
 ```
 
-계산 엔진과 실행 파일, 알고리즘별 호환 wrapper는 루트에 유지합니다. 화면 배치·스타일·이미지는 `assets/`, 검증 코드는 `tests/`, 기존 프로젝트 문서는 `docs/`에서 관리합니다.
+계산 엔진과 GUI·CLI 실행 파일은 루트에 유지합니다. 알고리즘별 호출 모듈은 `algorithms/`, 화면 배치·스타일·이미지는 `assets/`, 검증 코드는 `tests/`, 기존 프로젝트 문서는 `docs/`에서 관리합니다.
 
-## 기존 코드와의 호환성
+## 알고리즘 모듈 사용
 
-기존 프로젝트에서 사용하던 다음 형태의 호출은 wrapper 파일을 통해 유지했습니다.
+알고리즘별 `main(Info)`의 입력·반환 형식은 기존과 같습니다. 모듈을 `algorithms/`로 이동했으므로, 기존 `import FCFS` 대신 `from algorithms import FCFS`로 가져옵니다. 프로젝트 루트에서 실행하거나 프로젝트 루트가 Python 모듈 검색 경로에 있어야 합니다. GUI·CLI 실행 명령은 그대로 사용할 수 있습니다.
 
 ```python
-import FCFS
+from algorithms import FCFS
 
 info = [
     [(1, 0, 5), (2, 1, 3)],
@@ -170,7 +172,7 @@ result = FCFS.main(info)
 RR은 세 번째 값으로 Time Quantum을 전달할 수 있습니다.
 
 ```python
-import RR
+from algorithms import RR
 
 result = RR.main([
     [(1, 0, 5), (2, 1, 3)],
@@ -182,7 +184,7 @@ result = RR.main([
 DRR은 프로세스 정보에 GPT 모델과 Complexity를 추가합니다.
 
 ```python
-import DRR
+from algorithms import DRR
 
 result = DRR.main([
     [(1, 0, 8, "GPT 3.5", 3), (2, 0, 16, "GPT 4", 8)],
