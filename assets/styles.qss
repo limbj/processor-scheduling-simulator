@@ -16,8 +16,8 @@ QFrame#app_header {
 }
 
 QLabel#brand_mark {
-    color: #ffffff;
-    background: #325e9e;
+    background: #f4faf8;
+    border: 1px solid #d9e8e2;
     border-radius: 9px;
     font-size: 15px;
     font-weight: 600;
@@ -137,7 +137,7 @@ QGroupBox:disabled, QLabel:disabled {
     color: #9ba7b7;
 }
 
-QPushButton {
+QPushButton, QToolButton {
     background: #ffffff;
     color: #4a5b73;
     border: 1px solid #d5deea;
@@ -147,31 +147,37 @@ QPushButton {
     font-weight: 500;
 }
 
-QPushButton:hover {
+QPushButton:hover, QToolButton:hover {
     background: #f4f7fb;
     border-color: #a9bad3;
     color: #29476e;
 }
 
-QPushButton:pressed {
+QPushButton:pressed, QToolButton:pressed {
     background: #e9eff7;
 }
 
-QPushButton:focus {
+QPushButton:focus, QToolButton:focus {
     border-color: #6587bc;
 }
 
-QPushButton:checked {
+QPushButton:checked, QToolButton:checked {
     background: #eaf1fc;
     color: #315f9e;
     border-color: #8aa9d5;
     font-weight: 600;
 }
 
-QPushButton:disabled {
+QPushButton:disabled, QToolButton:disabled {
     color: #a2adbd;
     background: #f6f8fb;
     border-color: #e4e9f0;
+}
+
+QToolButton[role="option"] {
+    min-height: 54px;
+    padding: 4px 2px;
+    font-size: 11px;
 }
 
 QPushButton#pb_start {

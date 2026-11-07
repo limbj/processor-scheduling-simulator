@@ -10,7 +10,8 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 HAS_QT = importlib.util.find_spec("PyQt5") is not None
 
 if HAS_QT:
-    from PyQt5.QtCore import QPoint, QRect
+    from PyQt5.QtCore import QPoint, QRect, QSize
+    from PyQt5.QtGui import QIcon
     from PyQt5.QtWidgets import QApplication, QAbstractScrollArea, QMessageBox, QWidget
 
     import ui
@@ -100,6 +101,65 @@ class SchedulerDesignTests(unittest.TestCase):
         self.assertIsNone(self.window.selected_complexity_flag)
         for name in ("pb_model1", "pb_model2", "pb_high", "pb_mid", "pb_low"):
             self.assertFalse(getattr(self.window, name).isChecked(), name)
+        self.assert_scenario_icons()
+
+    def assert_scenario_icons(self, model=None, complexity=None):
+        expected = (
+            ("pb_model1", "gpt-icon.png" if model == 1 else "g_gpt-icon.png"),
+            ("pb_model2", "gpt4-icon.png" if model == 2 else "g_gpt-icon.png"),
+            ("pb_high", "complex.png" if complexity == 3 else "g_complex.png"),
+            ("pb_mid", "complex.png" if complexity == 4 else "g_complex.png"),
+            ("pb_low", "complex.png" if complexity == 5 else "g_complex.png"),
+        )
+        for name, image_name in expected:
+            with self.subTest(button=name, image=image_name):
+                button = getattr(self.window, name)
+                state = QIcon.On if button.isChecked() else QIcon.Off
+                actual = button.icon().pixmap(QSize(40, 40), QIcon.Normal, state).toImage()
+                reference = ui.icon(image_name).pixmap(QSize(40, 40)).toImage()
+                self.assertFalse(actual.isNull(), name)
+                self.assertFalse(reference.isNull(), image_name)
+                self.assertEqual(actual, reference, "%s should display %s" % (name, image_name))
+
+    def test_drr_icons_follow_exclusive_selection_and_repeated_clicks(self):
+        self.window.cb_algorithm.setCurrentIndex(6)
+        self.assert_scenario_selection_reset()
+
+        self.window.pb_model1.click()
+        self.assertTrue(self.window.pb_model1.isChecked())
+        self.assertFalse(self.window.pb_model2.isChecked())
+        self.assert_scenario_icons(model=1)
+        self.window.pb_model1.click()
+        self.assertTrue(self.window.pb_model1.isChecked())
+        self.assertEqual(self.window.selected_model_flag, 1)
+        self.assert_scenario_icons(model=1)
+        self.window.pb_model2.click()
+        self.assertFalse(self.window.pb_model1.isChecked())
+        self.assertTrue(self.window.pb_model2.isChecked())
+        self.assertEqual(self.window.selected_model_flag, 2)
+        self.assert_scenario_icons(model=2)
+
+        # A complete selection prompts for generation; declining restores gray icons.
+        self.window.pb_mid.click()
+        self.question.assert_called_once()
+        self.assertEqual(self.window.scheduler.processes, [])
+        self.assert_scenario_selection_reset()
+
+        self.window.pb_low.click()
+        self.assertTrue(self.window.pb_low.isChecked())
+        self.assertFalse(self.window.pb_mid.isChecked())
+        self.assertFalse(self.window.pb_high.isChecked())
+        self.assert_scenario_icons(complexity=5)
+        self.window.pb_low.click()
+        self.assertTrue(self.window.pb_low.isChecked())
+        self.assertEqual(self.window.selected_complexity_flag, 5)
+        self.assert_scenario_icons(complexity=5)
+        self.window.pb_high.click()
+        self.assertFalse(self.window.pb_low.isChecked())
+        self.assertFalse(self.window.pb_mid.isChecked())
+        self.assertTrue(self.window.pb_high.isChecked())
+        self.assertEqual(self.window.selected_complexity_flag, 3)
+        self.assert_scenario_icons(complexity=3)
 
     def test_drr_model_then_complexity_generates_three_expected_processes(self):
         self.window.cb_algorithm.setCurrentIndex(6)
@@ -244,15 +304,15 @@ class SchedulerDesignTests(unittest.TestCase):
         self.assertEqual(QApplication.platformName(), "offscreen")
         for index, core in enumerate((1, 1, 1, 2)):
             getattr(self.window, "cb_core%d" % index).setCurrentIndex(core)
-        for pid in range(1, 5):
-            self.window.createProcessFunction(pid, 0, 6)
+        for pid in range(1, 11):
+            self.window.createProcessFunction(pid, 0, 20)
         self.window.startFunction()
         self.window.resize(1360, 940)
         self.window.show()
         QApplication.processEvents()
 
         for table, required in (
-            (self.window.tw_process, 3),
+            (self.window.tw_process, 7),
             (self.window.tw_gantt, 4),
             (self.window.tw_result, 4),
         ):
@@ -269,6 +329,7 @@ class SchedulerDesignTests(unittest.TestCase):
                     complete_rows, required,
                     "The viewport should show the intended rows without inner scrolling.",
                 )
+        self.assertGreater(self.window.tw_gantt.horizontalScrollBar().maximum(), 0)
 
     def test_process_workspace_stays_left_of_settings_and_results(self):
         self.assertEqual(QApplication.platformName(), "offscreen")

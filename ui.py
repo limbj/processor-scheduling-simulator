@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QColor, QIcon
 from PyQt5.QtWidgets import (
     QAbstractItemView,
@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QLayout,
     QMainWindow,
     QMessageBox,
+    QSizePolicy,
     QTableWidgetItem,
 )
 
@@ -32,6 +33,13 @@ PROCESS_COLORS = (
 
 def icon(name: str) -> QIcon:
     return QIcon(str(ASSETS_DIR / "images" / name))
+
+
+def option_icon(inactive_name: str, active_name: str) -> QIcon:
+    result = QIcon()
+    result.addFile(str(ASSETS_DIR / "images" / inactive_name), QSize(), QIcon.Normal, QIcon.Off)
+    result.addFile(str(ASSETS_DIR / "images" / active_name), QSize(), QIcon.Normal, QIcon.On)
+    return result
 
 
 def readonly_item(text: str) -> QTableWidgetItem:
@@ -155,6 +163,7 @@ class OS_Scheduler(QMainWindow, form_class):
         self.pb_high.setCheckable(True)
         self.pb_mid.setCheckable(True)
         self.pb_low.setCheckable(True)
+        self._configure_icons()
 
         self.gb_Timeq.setVisible(False)
         self.pb_remove.setVisible(False)
@@ -167,7 +176,6 @@ class OS_Scheduler(QMainWindow, form_class):
         self.tw_result.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tw_gantt.horizontalHeader().setMinimumSectionSize(42)
         self.tw_gantt.horizontalHeader().setStretchLastSection(False)
-        self.tw_gantt.setMinimumHeight(170)
         self.tw_process.setMinimumHeight(132)
         self.tw_result.setMinimumHeight(164)
         self.workspace_layout.setSizeConstraint(QLayout.SetMinimumSize)
@@ -227,6 +235,52 @@ class OS_Scheduler(QMainWindow, form_class):
 
         self._update_core_label()
         self._clear_output()
+        self.tw_gantt.ensurePolished()
+        self.tw_gantt.horizontalHeader().ensurePolished()
+        self.tw_gantt.horizontalScrollBar().ensurePolished()
+        # Reserve four core rows and the horizontal scrollbar; give extra height to processes.
+        self.tw_gantt.setFixedHeight(
+            self.tw_gantt.horizontalHeader().sizeHint().height()
+            + len(self.core) * self.tw_gantt.verticalHeader().defaultSectionSize()
+            + self.tw_gantt.horizontalScrollBar().sizeHint().height()
+            + 2 * self.tw_gantt.frameWidth()
+        )
+
+    def _configure_icons(self) -> None:
+        self.brand_mark.setText("")
+        self.brand_mark.setPixmap(icon("logo.png").pixmap(32, 32))
+        self.brand_mark.setAccessibleName("프로세서 스케줄링 시뮬레이터")
+
+        for name, image_name, size in (
+            ("pb_start", "exe.png", 26),
+            ("pb_random", "random.png", 22),
+            ("pb_savep", "plus.png", 16),
+            ("pb_resetp", "reset.png", 16),
+            ("pb_remove", "delete.png", 16),
+        ):
+            button = getattr(self, name)
+            button.setIcon(icon(image_name))
+            button.setIconSize(QSize(size, size))
+
+        for index in range(1, 4):
+            for direction in ("up", "down"):
+                button = getattr(self, "pb_{}{}".format(direction, index))
+                button.setText("")
+                button.setIcon(icon("{}.png".format(direction)))
+                button.setIconSize(QSize(10, 10))
+
+        for name, inactive_name, active_name in (
+            ("pb_model1", "g_gpt-icon.png", "gpt-icon.png"),
+            ("pb_model2", "g_gpt-icon.png", "gpt4-icon.png"),
+            ("pb_high", "g_complex.png", "complex.png"),
+            ("pb_mid", "g_complex.png", "complex.png"),
+            ("pb_low", "g_complex.png", "complex.png"),
+        ):
+            button = getattr(self, name)
+            button.setIcon(option_icon(inactive_name, active_name))
+            button.setIconSize(QSize(40, 40))
+            button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def _update_core_label(self) -> None:
         self.lb_core.setText(
