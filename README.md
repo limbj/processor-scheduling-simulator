@@ -149,7 +149,10 @@ processor-scheduling-simulator/
 │  ├─ os.ui              # Qt Designer 화면 배치
 │  ├─ styles.qss         # 화면 색상·글꼴·표·버튼 테마
 │  └─ images/            # 로고와 기존 이미지
-├─ docs/                 # 기존 프로젝트 문서
+├─ docs/                 # 개발 기록·참고자료
+│  ├─ README.md          # 문서별 내용 안내
+│  ├─ development-notes.docx
+│  └─ scheduling-references.docx
 ├─ tests/                # 엔진·GUI·리소스 경로 회귀 테스트
 ├─ .gitignore
 ├─ CHANGELOG.md
@@ -158,6 +161,8 @@ processor-scheduling-simulator/
 ```
 
 계산 엔진과 GUI·CLI 실행 파일은 루트에 유지합니다. 알고리즘별 호출 모듈은 `algorithms/`, 화면 배치·스타일·이미지는 `assets/`, 검증 코드는 `tests/`, 기존 프로젝트 문서는 `docs/`에서 관리합니다.
+
+문서별 내용과 용도는 [문서 안내](docs/README.md)에서 확인할 수 있습니다.
 
 ## 알고리즘 모듈 사용
 
