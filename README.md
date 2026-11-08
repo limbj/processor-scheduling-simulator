@@ -6,7 +6,6 @@
 
 <img src="https://img.shields.io/badge/Python-3.9-3776AB?logo=python&logoColor=white" alt="Python 3.9">
 <img src="https://img.shields.io/badge/PyQt5-5.15.7-41CD52?logo=qt&logoColor=white" alt="PyQt5 5.15.7">
-<img src="https://img.shields.io/badge/Algorithms-6-325E9E" alt="6 algorithms">
 
 [화면 미리보기](#화면-미리보기) · [주요 기능](#주요-기능) · [알고리즘](#스케줄링-알고리즘) · [실행 방법](#실행과-개발) · [문서](#문서)
 
