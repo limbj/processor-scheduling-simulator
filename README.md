@@ -44,16 +44,11 @@
 
 ## DRR 시나리오
 
-**GPT 3.5·GPT 4와 질문 복잡도를 선택하면 프로세스 3개를 생성합니다.** 모델 선택은 로컬 시나리오 프리셋이며, API 키 없이 사용할 수 있습니다.
-
-<details>
-<summary><strong>DRR 실행 화면 보기</strong></summary>
+**GPT 3.5·GPT 4와 질문 복잡도를 선택하면 프로세스 3개를 생성합니다.**
 
 ![DRR 시나리오의 코어 배치, 동적 실행 타임라인과 OUT 결과](docs/screenshots/drr-scenario.png)
 
 GPT 3.5·보통 복잡도와 GPT 4·높은 복잡도로 생성한 프로세스를 함께 실행한 예시입니다. GPT 4 버튼은 다음 생성을 위해 다시 선택한 상태입니다.
-
-</details>
 
 ## 결과 지표
 
