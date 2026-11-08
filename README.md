@@ -18,16 +18,15 @@
 
 <p align="center"><sub>FCFS · P-Core 3개 + E-Core 1개 · 프로세스 10개</sub></p>
 
-프로세스를 구성하고 알고리즘을 실행하면 **누가 언제 코어를 사용했는지**, **얼마나 기다렸는지**, **전력 모델 값이 어떻게 달라지는지**를 한 화면에서 확인할 수 있습니다.
+코어별 실행 순서·프로세스 대기 시간·전력 모델 값을 한 화면에서 비교합니다.
 
 ## 주요 기능
 
 | 기능 | 내용 |
 | --- | --- |
-| **프로세스 구성** | PID·도착 시간·작업량을 직접 입력하거나 랜덤 생성하고, 선택한 프로세스를 삭제합니다. |
+| **프로세스 구성** | PID·도착 시간·작업량을 직접 입력하거나 무작위로 생성합니다. |
 | **코어 설정** | 최대 4개 코어를 Off·P-Core·E-Core로 구성합니다. P-Core는 최대 3개, E-Core는 최대 1개입니다. |
-| **알고리즘 실험** | 6가지 알고리즘 중 하나를 선택해 실행합니다. RR은 시간 할당량을 조절할 수 있습니다. |
-| **실행 타임라인** | 코어별 프로세스 배치와 유휴 구간을 색상으로 구분하고, 긴 결과는 가로로 탐색합니다. |
+| **실행 타임라인** | 코어별 프로세스 배치와 유휴 구간을 색상으로 구분합니다. |
 | **결과 분석** | 프로세스별 WT·TT·NTT와 전체 실행 시간·평균 지표·코어별 전력 모델 값을 확인합니다. |
 | **DRR 시나리오** | GPT 모델·질문 복잡도 프리셋으로 프로세스를 생성하고, 동적 시간 할당과 OUT 상태를 확인합니다. |
 
@@ -39,16 +38,16 @@
 | **RR** · Round Robin | 설정한 시간 할당량만큼 번갈아 실행합니다. |
 | **SPN** · Shortest Process Next | 대기 중인 프로세스 중 작업량이 가장 작은 것을 선택합니다. |
 | **SRTN** · Shortest Remaining Time Next | 남은 작업량이 가장 작은 프로세스를 우선 배치하는 선점 방식입니다. |
-| **HRRN** · Highest Response Ratio Next | 대기 시간과 작업량으로 계산한 응답비율이 높은 프로세스를 선택합니다. |
-| **DRR** · Dynamic Round Robin | 복잡도에 따라 P/E-Core를 우선 배치하고, 남은 작업량에 따라 시간 할당량을 조절합니다. |
+| **HRRN** · Highest Response Ratio Next | 대기 시간과 작업량으로 계산한 응답 비율이 높은 프로세스를 선택합니다. |
+| **DRR** · Dynamic Round Robin | 복잡도와 남은 작업량에 따라 P-Core·E-Core 배치와 시간 할당량을 조절합니다. |
 
 ## DRR 시나리오
 
-**GPT 3.5·GPT 4와 질문 복잡도를 선택하면 프로세스 3개를 생성합니다.**
+**GPT 3.5 또는 GPT 4를 고르고 질문 복잡도를 설정하면 프로세스 3개가 생성됩니다.**
 
 ![DRR 시나리오의 코어 배치, 동적 실행 타임라인과 OUT 결과](docs/screenshots/drr-scenario.png)
 
-GPT 3.5·보통 복잡도와 GPT 4·높은 복잡도로 생성한 프로세스를 함께 실행한 예시입니다. GPT 4 버튼은 다음 생성을 위해 다시 선택한 상태입니다.
+GPT 3.5·보통 복잡도와 GPT 4·높은 복잡도로 생성한 프로세스를 함께 실행한 예시입니다.
 
 ## 결과 지표
 
@@ -66,7 +65,7 @@ GPT 3.5·보통 복잡도와 GPT 4·높은 복잡도로 생성한 프로세스�
 <details>
 <summary><strong>설치하고 GUI 실행하기</strong></summary>
 
-Python 3.9 환경에서 프로젝트 루트를 기준으로 실행합니다. Windows:
+Windows에서는 Python 3.9를 준비한 뒤 프로젝트 루트에서 실행합니다.
 
 ```powershell
 py -3.9 -m venv .venv
@@ -74,7 +73,7 @@ py -3.9 -m venv .venv
 .\.venv\Scripts\python.exe ui.py
 ```
 
-알고리즘과 코어를 선택하고 프로세스를 추가한 뒤 **시뮬레이션 실행**을 누릅니다. RR은 시간 할당량을, DRR은 모델과 복잡도를 설정합니다.
+알고리즘·코어·프로세스를 설정한 뒤 **시뮬레이션 실행**을 누릅니다.
 
 macOS·Linux 설치와 자세한 조작 방법은 [사용 안내](docs/usage.md)를 참고하세요.
 
@@ -83,7 +82,7 @@ macOS·Linux 설치와 자세한 조작 방법은 [사용 안내](docs/usage.md)
 <details>
 <summary><strong>CLI 데모와 테스트 실행하기</strong></summary>
 
-가상환경을 설치한 뒤 프로젝트 루트에서 실행합니다. Windows:
+위 가상환경을 만든 뒤 프로젝트 루트에서 실행합니다.
 
 ```powershell
 # GUI 없이 DRR 예제 실행
@@ -92,8 +91,6 @@ macOS·Linux 설치와 자세한 조작 방법은 [사용 안내](docs/usage.md)
 # 엔진·GUI·리소스 경로 회귀 테스트
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
-
-GUI 테스트는 offscreen Qt 위젯으로 실행합니다. PyQt5가 없는 환경에서는 GUI 테스트를 건너뜁니다.
 
 </details>
 
@@ -113,7 +110,4 @@ processor-scheduling-simulator/
 
 ## 문서
 
-- [사용 안내](docs/usage.md) — 설치, GUI·CLI 실행, 테스트, Python 모듈 호출 예제
-- [시뮬레이션 모델](docs/scheduling-model.md) — P/E-Core 모델, DRR 정책, 지표 계산 기준
-- [문서 목록](docs/README.md) — 현재 안내와 개발 당시 기록·참고자료
-- [변경 기록](CHANGELOG.md)
+[사용 안내](docs/usage.md) · [시뮬레이션 모델](docs/scheduling-model.md) · [문서 목록](docs/README.md) · [변경 기록](CHANGELOG.md)
